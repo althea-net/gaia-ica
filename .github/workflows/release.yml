@@ -22,8 +22,6 @@ jobs:
                     check-latest: true
             -   name: Build Artifacts
                 run: make distclean build-reproducible
-            -   name: generate release note
-                run: go run ./contrib/generate_release_note/main.go ${{ env.VERSION }} ./artifacts/build_report ./CHANGELOG.md
             -   name: Create Release
                 id: create_release
                 uses: actions/create-release@v1
@@ -32,18 +30,8 @@ jobs:
                 with:
                     tag_name: ${{ github.ref }}
                     release_name: Release ${{ github.ref }}
-                    body_path: ./releasenote
                     draft: true
                     prerelease: false
-            -   name: Upload build_report
-                uses: actions/upload-release-asset@v1
-                env:
-                    GITHUB_TOKEN: ${{ github.token }}
-                with:
-                    upload_url: ${{ steps.create_release.outputs.upload_url }}
-                    asset_path: ./artifacts/build_report
-                    asset_name: build_report
-                    asset_content_type: application/file
             -   name: Upload darwin-amd64 artifact
                 uses: actions/upload-release-asset@v1
                 env:
@@ -96,5 +84,5 @@ jobs:
                 with:
                     upload_url: ${{ steps.create_release.outputs.upload_url }}
                     asset_path: ./artifacts/gaiad-${{ env.VERSION }}.tar.gz
-                    asset_name: gaiad-${{ env.RELEASE_VERSION }}.tar.gz
+                    asset_name: gaiad-${{ env.VERSION }}.tar.gz
                     asset_content_type: application/gzip
