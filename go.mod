@@ -9,7 +9,6 @@ require (
 	github.com/cosmos/ibc-go/v3 v3.2.1
 	github.com/golangci/golangci-lint v1.48.0
 	github.com/gorilla/mux v1.8.0
-	github.com/gravity-devs/liquidity v1.5.1
 	github.com/ory/dockertest/v3 v3.8.1
 	github.com/rakyll/statik v0.1.7
 	github.com/spf13/cast v1.5.0
