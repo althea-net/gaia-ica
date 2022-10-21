@@ -205,9 +205,9 @@ type GaiaApp struct { // nolint: golint
 	ParamsKeeper     paramskeeper.Keeper
 	// IBC Keeper must be a pointer in the app, so we can SetRouter on it correctly
 	IBCKeeper           *ibckeeper.Keeper
-	ICAControllerKeeper *icacontrollerkeeper.Keeper
 	ICAHostKeeper       *icahostkeeper.Keeper
 	ICAAuthKeeper       *icaauthkeeper.Keeper
+	ICAControllerKeeper *icacontrollerkeeper.Keeper
 	EvidenceKeeper      evidencekeeper.Keeper
 	TransferKeeper      ibctransferkeeper.Keeper
 	FeeGrantKeeper      feegrantkeeper.Keeper
@@ -217,9 +217,9 @@ type GaiaApp struct { // nolint: golint
 	// make scoped keepers public for test purposes
 	ScopedIBCKeeper           capabilitykeeper.ScopedKeeper
 	ScopedTransferKeeper      capabilitykeeper.ScopedKeeper
-	ScopedICAHostKeeper       capabilitykeeper.ScopedKeeper
-	ScopedICAControllerKeeper capabilitykeeper.ScopedKeeper
 	ScopedICAAuthKeeper       capabilitykeeper.ScopedKeeper
+	ScopedICAControllerKeeper capabilitykeeper.ScopedKeeper
+	ScopedICAHostKeeper       capabilitykeeper.ScopedKeeper
 
 	// the module manager
 	mm *module.Manager
@@ -297,9 +297,10 @@ func NewGaiaApp(
 	app.CapabilityKeeper = capabilitykeeper.NewKeeper(appCodec, keys[capabilitytypes.StoreKey], memKeys[capabilitytypes.MemStoreKey])
 	scopedIBCKeeper := app.CapabilityKeeper.ScopeToModule(ibchost.ModuleName)
 	scopedTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibctransfertypes.ModuleName)
-	scopedICAControllerKeeper := app.CapabilityKeeper.ScopeToModule(icacontrollertypes.SubModuleName)
-	scopedICAHostKeeper := app.CapabilityKeeper.ScopeToModule(icahosttypes.SubModuleName)
 	scopedICAAuthKeeper := app.CapabilityKeeper.ScopeToModule(icaauthtypes.ModuleName)
+	scopedICAHostKeeper := app.CapabilityKeeper.ScopeToModule(icahosttypes.SubModuleName)
+
+	scopedICAControllerKeeper := app.CapabilityKeeper.ScopeToModule(icacontrollertypes.SubModuleName)
 
 	app.CapabilityKeeper.Seal()
 
@@ -442,14 +443,16 @@ func NewGaiaApp(
 		scopedICAControllerKeeper,
 		bApp.MsgServiceRouter(),
 	)
+
 	app.ICAControllerKeeper = &icaControllerKeeper
 
-	icaModule := ica.NewAppModule(app.ICAControllerKeeper, app.ICAHostKeeper)
+	icaModule := ica.NewAppModule(&icaControllerKeeper, &icaHostKeeper)
 
 	icaAuthKeeper := icaauthkeeper.NewKeeper(
 		appCodec, keys[icaauthtypes.StoreKey],
 		icaControllerKeeper, scopedICAAuthKeeper,
 	)
+
 	app.ICAAuthKeeper = &icaAuthKeeper
 
 	icaAuthModule := icaauth.NewAppModule(appCodec, *app.ICAAuthKeeper)
@@ -529,7 +532,6 @@ func NewGaiaApp(
 		ibctransfertypes.ModuleName,
 		ibchost.ModuleName,
 		icatypes.ModuleName,
-		icaauthtypes.ModuleName,
 		routertypes.ModuleName,
 		authtypes.ModuleName,
 		banktypes.ModuleName,
@@ -542,6 +544,7 @@ func NewGaiaApp(
 		feegrant.ModuleName,
 		paramstypes.ModuleName,
 		vestingtypes.ModuleName,
+		icaauthtypes.ModuleName,
 	)
 	app.mm.SetOrderEndBlockers(
 		crisistypes.ModuleName,
@@ -550,7 +553,6 @@ func NewGaiaApp(
 		ibctransfertypes.ModuleName,
 		ibchost.ModuleName,
 		icatypes.ModuleName,
-		icaauthtypes.ModuleName,
 		routertypes.ModuleName,
 		feegrant.ModuleName,
 		authz.ModuleName,
@@ -565,6 +567,7 @@ func NewGaiaApp(
 		paramstypes.ModuleName,
 		upgradetypes.ModuleName,
 		vestingtypes.ModuleName,
+		icaauthtypes.ModuleName,
 	)
 
 	// NOTE: The genutils module must occur after staking so that pools are
@@ -585,7 +588,6 @@ func NewGaiaApp(
 		ibctransfertypes.ModuleName,
 		ibchost.ModuleName,
 		icatypes.ModuleName,
-		icaauthtypes.ModuleName,
 		evidencetypes.ModuleName,
 		feegrant.ModuleName,
 		authz.ModuleName,
@@ -595,6 +597,7 @@ func NewGaiaApp(
 		paramstypes.ModuleName,
 		upgradetypes.ModuleName,
 		vestingtypes.ModuleName,
+		icaauthtypes.ModuleName,
 	)
 
 	app.mm.RegisterInvariants(&app.CrisisKeeper)
@@ -658,7 +661,7 @@ func NewGaiaApp(
 		func(ctx sdk.Context, _ upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
 			fromVM[icatypes.ModuleName] = icaModule.ConsensusVersion()
 			// create ICS27 Controller submodule params
-			controllerParams := icacontrollertypes.Params{}
+			controllerParams := icacontrollertypes.Params{ControllerEnabled: true}
 			// create ICS27 Host submodule params
 			hostParams := icahosttypes.Params{
 				HostEnabled: true,
@@ -709,7 +712,11 @@ func NewGaiaApp(
 
 	if upgradeInfo.Name == upgradeName && !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
 		storeUpgrades := store.StoreUpgrades{
-			Added: []string{icahosttypes.StoreKey},
+			Added: []string{
+				icacontrollertypes.StoreKey,
+				icahosttypes.StoreKey,
+				icaauthtypes.StoreKey,
+			},
 		}
 
 		// configure store loader that checks if version == upgradeHeight and applies store upgrades
@@ -752,13 +759,6 @@ func (app *GaiaApp) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci
 	}
 
 	app.UpgradeKeeper.SetModuleVersionMap(ctx, app.mm.GetVersionMap())
-
-	// Enable both the controller and the host on chain init
-	app.ICAControllerKeeper.SetParams(ctx, icacontrollertypes.Params{ControllerEnabled: true})
-	app.ICAHostKeeper.SetParams(ctx, icahosttypes.Params{
-		HostEnabled:   true,
-		AllowMessages: []string{"*"}, // allow all messages to be submitted
-	})
 
 	return app.mm.InitGenesis(ctx, app.appCodec, genesisState)
 }
@@ -855,16 +855,6 @@ func (app *GaiaApp) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APICo
 	}
 }
 
-// RegisterTxService implements the Application.RegisterTxService method.
-func (app *GaiaApp) RegisterTxService(clientCtx client.Context) {
-	authtx.RegisterTxService(app.BaseApp.GRPCQueryRouter(), clientCtx, app.BaseApp.Simulate, app.interfaceRegistry)
-}
-
-// RegisterTendermintService implements the Application.RegisterTendermintService method.
-func (app *GaiaApp) RegisterTendermintService(clientCtx client.Context) {
-	tmservice.RegisterTendermintService(app.BaseApp.GRPCQueryRouter(), clientCtx, app.interfaceRegistry)
-}
-
 // RegisterSwaggerAPI registers swagger route with API Server
 func RegisterSwaggerAPI(rtr *mux.Router) {
 	statikFS, err := fs.New()
@@ -874,6 +864,16 @@ func RegisterSwaggerAPI(rtr *mux.Router) {
 
 	staticServer := http.FileServer(statikFS)
 	rtr.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", staticServer))
+}
+
+// RegisterTxService implements the Application.RegisterTxService method.
+func (app *GaiaApp) RegisterTxService(clientCtx client.Context) {
+	authtx.RegisterTxService(app.BaseApp.GRPCQueryRouter(), clientCtx, app.BaseApp.Simulate, app.interfaceRegistry)
+}
+
+// RegisterTendermintService implements the Application.RegisterTendermintService method.
+func (app *GaiaApp) RegisterTendermintService(clientCtx client.Context) {
+	tmservice.RegisterTendermintService(app.BaseApp.GRPCQueryRouter(), clientCtx, app.interfaceRegistry)
 }
 
 // initParamsKeeper init params keeper and its subspaces
