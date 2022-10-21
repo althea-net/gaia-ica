@@ -4,9 +4,9 @@ go 1.18
 
 require (
 	github.com/Gravity-Bridge/Gravity-Bridge/module v1.7.1
-	github.com/cosmos/cosmos-sdk v0.45.8
+	github.com/cosmos/cosmos-sdk v0.45.9
 	github.com/cosmos/go-bip39 v1.0.0
-	github.com/cosmos/ibc-go/v3 v3.2.1
+	github.com/cosmos/ibc-go/v3 v3.3.0
 	github.com/golangci/golangci-lint v1.48.0
 	github.com/gorilla/mux v1.8.0
 	github.com/ory/dockertest/v3 v3.8.1
@@ -61,7 +61,7 @@ require (
 	github.com/containerd/continuity v0.3.0 // indirect
 	github.com/cosmos/btcutil v1.0.4 // indirect
 	github.com/cosmos/gorocksdb v1.2.0 // indirect
-	github.com/cosmos/iavl v0.19.1 // indirect
+	github.com/cosmos/iavl v0.19.3 // indirect
 	github.com/cosmos/ledger-cosmos-go v0.11.1 // indirect
 	github.com/cosmos/ledger-go v0.9.3 // indirect
 	github.com/creachadair/taskgroup v0.3.2 // indirect
@@ -275,6 +275,7 @@ require (
 
 replace (
 	github.com/Gravity-Bridge/Gravity-Bridge/module => github.com/Gravity-Bridge/Gravity-Bridge/module v1.4.2-0.20221005182322-718529f82e17
+	github.com/cosmos/ibc-go/v3 => github.com/althea-net/ibc-go/v3 v3.3.3
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	google.golang.org/grpc => google.golang.org/grpc v1.33.2
 )
