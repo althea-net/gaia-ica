@@ -24,6 +24,6 @@
     "atom"
   ],
   "devDependencies": {
-    "picocolors": "^1.0.0"
+    "picocolors": "^1.0.1"
   }
 }
